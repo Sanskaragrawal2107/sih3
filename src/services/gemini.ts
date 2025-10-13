@@ -3,7 +3,8 @@ import { DPRAnalysis } from '../types';
 
 export async function analyzeDPRWithGemini(
   file: File,
-  guidelinesText: string
+  guidelinesText: string,
+  language: 'en' | 'as' = 'en'
 ): Promise<DPRAnalysis> {
   try {
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -16,6 +17,14 @@ export async function analyzeDPRWithGemini(
         ''
       )
     );
+    
+    console.log('File details:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + 'MB',
+      base64Length: base64Data.length
+    });
 
     const promptText = `You are a Senior DPR (Detailed Project Report) Evaluation Specialist with over 10 years of experience working with the Ministry of Development of North Eastern Region (MDoNER). You have successfully evaluated hundreds of project proposals and have deep expertise in:
 
@@ -29,12 +38,27 @@ export async function analyzeDPRWithGemini(
 - Project timeline and resource allocation optimization
 
 Your evaluation approach is:
-✓ METICULOUS: You examine every single page, paragraph, table, chart, image, and appendix
-✓ CRITICAL: You identify even minor discrepancies that could escalate into major issues
+✓ THOROUGH: You examine every page, paragraph, table, chart, image, diagram, scanned document, and appendix
+✓ OCR-ENABLED: You extract and analyze ALL text from images, scanned pages, tables, charts, diagrams, and embedded pictures
+✓ IMAGE-AWARE: You carefully read text within images, screenshots, photos of documents, handwritten notes, and any visual content
+✓ TABLE-EXPERT: You extract complete data from tables, BOQ (Bill of Quantities), cost estimates, and financial schedules even if they are images
+✓ BALANCED: You identify genuine issues that could impact project success, while acknowledging good practices
 ✓ EVIDENCE-BASED: You cite specific sections, page numbers, and data points when identifying issues
-✓ GUIDELINE-DRIVEN: You strictly compare every aspect against official MDoNER guidelines
+✓ FAIR: You evaluate against MDoNER guidelines but understand that minor variations are acceptable if justified
 ✓ COMPREHENSIVE: You evaluate technical, financial, environmental, social, and administrative dimensions
-✓ CONSTRUCTIVE: You provide actionable recommendations for each identified issue
+✓ CONSTRUCTIVE: You provide actionable recommendations and acknowledge project strengths
+✓ PRACTICAL: You focus on issues that materially affect project viability, not just minor formatting or documentation gaps
+
+IMPORTANT: This document may contain:
+- Scanned pages with text in images
+- Tables and charts as images
+- BOQ (Bill of Quantities) in image format
+- Cost estimates and budgets in scanned tables
+- Technical drawings and diagrams with annotations
+- Photos of documents or handwritten notes
+- Screenshots of data or reports
+
+YOU MUST extract and analyze ALL text from these images. Do not skip any visual content. Read every table, chart, and image carefully.
 
 OFFICIAL MDoNER GUIDELINES FOR REFERENCE:
 ${guidelinesText}
@@ -42,13 +66,17 @@ ${guidelinesText}
 EVALUATION TASK:
 Conduct a thorough, page-by-page evaluation of the uploaded DPR document. Examine:
 
-1. **BUDGET & FINANCIAL ANALYSIS**
+1. **BUDGET & FINANCIAL ANALYSIS** (EXTRACT FROM IMAGES/TABLES)
+   - **CRITICAL**: Extract ALL cost data from tables, even if they are images or scanned pages
+   - Read BOQ (Bill of Quantities) tables completely, including material names, quantities, rates, and amounts
+   - Extract budget tables, cost estimates, and financial schedules from images
    - Verify all cost estimates against market rates and guidelines
    - Check for arithmetic errors in calculations
    - Validate budget allocation across components
    - Assess financial sustainability and O&M provisions
    - Review funding sources and disbursement schedules
    - Identify any unrealistic or inflated cost projections
+   - **DO NOT SKIP**: If you see a table or chart as an image, read every cell and extract all data
 
 2. **PROJECT TIMELINE & SCHEDULING**
    - Evaluate feasibility of proposed timelines
@@ -122,34 +150,95 @@ OUTPUT FORMAT (strict JSON):
 }
 
 EVALUATION STANDARDS:
-- Critical Severity: Issues that make the project non-viable or violate mandatory requirements
-- High Severity: Significant gaps that could lead to project failure or major delays
-- Medium Severity: Important issues requiring attention before approval
-- Low Severity: Minor improvements that would enhance project quality
+- Critical Severity: ONLY for issues that make the project completely non-viable or violate mandatory legal/regulatory requirements
+- High Severity: Significant gaps that could lead to project failure, major cost overruns, or substantial delays
+- Medium Severity: Important issues that should be addressed but don't prevent project approval with conditions
+- Low Severity: Minor improvements, documentation gaps, or suggestions that would enhance project quality
 
-Analyze the COMPLETE document now. Be thorough, be critical, be specific. Return ONLY the JSON object.`;
+IMPORTANT GUIDELINES:
+- Focus on material issues that affect project success
+- Don't flag minor documentation formatting issues as high severity
+- Acknowledge when the project has good elements
+- Be constructive and solution-oriented
+- Only mark as "Critical" if the project truly cannot proceed
+
+Analyze the COMPLETE document now. Be thorough, balanced, and constructive.
+
+${language === 'as' ? `
+CRITICAL LANGUAGE REQUIREMENT:
+- Write ALL text content in ASSAMESE (অসমীয়া) language
+- This includes: issue descriptions, details, recommendations, summary, strengths, missing components
+- Use Assamese script (অসমীয়া লিপি) for all text fields
+- Keep field names in English (e.g., "issue", "details") but VALUES in Assamese
+- Example: "issue": "বাজেট সম্পৰ্কীয় সমস্যা" (not "Budget Issue")
+` : `
+- Write all content in clear, professional ENGLISH
+`}
+
+Return ONLY the JSON object.`;
 
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.3,
+        maxOutputTokens: 163840, // Increased for complete responses
       },
     });
 
-    const result = await model.generateContent([
-      promptText,
-      {
-        inlineData: {
-          mimeType: file.type,
-          data: base64Data,
-        },
-      },
-    ]);
+    // Add timeout and retry logic
+    let result;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries <= maxRetries) {
+      try {
+        result = await model.generateContent([
+          promptText,
+          {
+            inlineData: {
+              mimeType: file.type,
+              data: base64Data,
+            },
+          },
+        ]);
+        break; // Success, exit loop
+      } catch (error: any) {
+        retries++;
+        if (retries > maxRetries || !error.message?.includes('503')) {
+          throw error; // Not a timeout or max retries reached
+        }
+        console.log(`Retry ${retries}/${maxRetries} after timeout...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      }
+    }
+
+    if (!result) {
+      throw new Error('Failed to get response after retries');
+    }
 
     const response = await result.response;
+    
+    console.log('Response object:', response);
+    console.log('Response candidates:', response.candidates);
+    
+    // Check if response was blocked by safety filters
+    if (!response.candidates || response.candidates.length === 0) {
+      console.error('No candidates in response - may be blocked by safety filters');
+      throw new Error('Gemini API blocked the response. This may be due to safety filters or content policy. Try with a different document.');
+    }
 
     // Parse response
-    let responseText = response.text();
+    let responseText = '';
+    try {
+      responseText = response.text();
+    } catch (textError: any) {
+      console.error('Error getting text from response:', textError);
+      throw new Error('Failed to extract text from Gemini response. The response may be empty or blocked.');
+    }
+    
+    console.log('Raw Gemini Response (first 500 chars):', responseText.substring(0, 500));
+    console.log('Response length:', responseText.length);
+    console.log('Full response:', responseText);
     
     // Remove markdown code blocks if present
     responseText = responseText.trim();
@@ -170,10 +259,151 @@ Analyze the COMPLETE document now. Be thorough, be critical, be specific. Return
       responseText = jsonMatch[0];
     }
 
-    const analysis: DPRAnalysis = JSON.parse(responseText);
-    return analysis;
-  } catch (error) {
+    // Check if response is empty or too short
+    if (!responseText || responseText.length < 10) {
+      console.error('Empty or invalid response from Gemini');
+      throw new Error('Gemini returned an empty response. The document may be too large or the API may be overloaded. Please try again with a smaller file.');
+    }
+
+    // Validate JSON before parsing
+    try {
+      // Try to repair common JSON issues
+      let repairedJson = responseText.trim();
+      
+      console.log('Attempting to parse JSON, length:', repairedJson.length);
+      
+      // Remove any markdown code blocks
+      repairedJson = repairedJson.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      
+      // Fix unterminated strings and arrays
+      if (!repairedJson.endsWith('}')) {
+        console.warn('JSON appears incomplete, attempting to repair...');
+        
+        // If we have an unterminated string, try to close it
+        const openQuotes = (repairedJson.match(/"/g) || []).length;
+        if (openQuotes % 2 !== 0) {
+          console.warn('Unterminated string detected, adding closing quote');
+          repairedJson += '"';
+        }
+        
+        // Close any open arrays
+        const openBrackets = (repairedJson.match(/\[/g) || []).length;
+        const closeBrackets = (repairedJson.match(/\]/g) || []).length;
+        if (openBrackets > closeBrackets) {
+          const missing = openBrackets - closeBrackets;
+          repairedJson += ']'.repeat(missing);
+          console.log(`Added ${missing} closing bracket(s)`);
+        }
+        
+        // Close any open braces
+        const openBraces = (repairedJson.match(/\{/g) || []).length;
+        const closeBraces = (repairedJson.match(/\}/g) || []).length;
+        if (openBraces > closeBraces) {
+          const missing = openBraces - closeBraces;
+          repairedJson += '}'.repeat(missing);
+          console.log(`Added ${missing} closing brace(s)`);
+        }
+      }
+      
+      // Try to parse
+      let analysis: DPRAnalysis;
+      try {
+        analysis = JSON.parse(repairedJson);
+      } catch (firstError: any) {
+        console.warn('First parse failed, attempting aggressive repair...', firstError.message);
+        
+        // More aggressive repair: try to extract valid JSON up to the error
+        const errorMatch = firstError.message.match(/position (\d+)/);
+        if (errorMatch) {
+          const errorPos = parseInt(errorMatch[1]);
+          console.log(`Error at position ${errorPos}, truncating and repairing...`);
+          
+          // Truncate at error position and try to close properly
+          let truncated = repairedJson.substring(0, errorPos);
+          
+          // Remove incomplete field
+          const lastComma = truncated.lastIndexOf(',');
+          const lastColon = truncated.lastIndexOf(':');
+          if (lastColon > lastComma) {
+            // We're in the middle of a field value, remove it
+            truncated = truncated.substring(0, lastComma > 0 ? lastComma : truncated.lastIndexOf('{'));
+          }
+          
+          // Close all open structures
+          const openBrackets = (truncated.match(/\[/g) || []).length;
+          const closeBrackets = (truncated.match(/\]/g) || []).length;
+          truncated += ']'.repeat(Math.max(0, openBrackets - closeBrackets));
+          
+          const openBraces = (truncated.match(/\{/g) || []).length;
+          const closeBraces = (truncated.match(/\}/g) || []).length;
+          truncated += '}'.repeat(Math.max(0, openBraces - closeBraces));
+          
+          console.log('Attempting to parse truncated JSON...');
+          analysis = JSON.parse(truncated);
+        } else {
+          throw firstError;
+        }
+      }
+      
+      // Validate required fields
+      if (!analysis.overall_compliance || !analysis.red_flags || !analysis.summary) {
+        throw new Error('Incomplete analysis response - missing required fields');
+      }
+      
+      // Ensure arrays exist
+      if (!Array.isArray(analysis.red_flags)) {
+        analysis.red_flags = [];
+      }
+      if (!Array.isArray(analysis.missing_components)) {
+        analysis.missing_components = [];
+      }
+      if (!Array.isArray(analysis.strengths)) {
+        analysis.strengths = [];
+      }
+      
+      return analysis;
+    } catch (parseError: any) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Failed to parse response:', responseText.substring(0, 1000));
+      
+      // If JSON is completely broken, try to extract what we can
+      if (parseError.message.includes('Unterminated string') || parseError.message.includes('Unexpected end')) {
+        console.warn('Attempting emergency JSON extraction...');
+        
+        // Return a minimal valid response
+        return {
+          overall_compliance: 'Medium',
+          compliance_score: 50,
+          red_flags: [{
+            category: 'Technical',
+            severity: 'High',
+            issue: 'Analysis Incomplete',
+            details: 'The AI analysis was interrupted. Please try again with a smaller file or retry the analysis.',
+            guideline_violated: 'N/A',
+            recommendation: 'Re-upload the document and try again. If the issue persists, try reducing the file size or splitting the document.'
+          }],
+          missing_components: ['Complete analysis could not be generated'],
+          strengths: [],
+          summary: 'Analysis was interrupted due to response timeout or size limits. Please retry with a smaller document (< 5MB recommended) or try again later.'
+        };
+      }
+      
+      throw new Error(`Failed to parse Gemini response: ${parseError.message}. The response may be incomplete or malformed.`);
+    }
+  } catch (error: any) {
     console.error('Error analyzing DPR:', error);
-    throw new Error('Failed to analyze DPR with Gemini');
+    
+    // Provide more specific error messages
+    if (error.message?.includes('503') || error.message?.includes('timeout')) {
+      throw new Error('Gemini API timeout - Your document may be too large or complex. Try: 1) Reducing file size, 2) Waiting a moment and retrying, 3) Checking your internet connection.');
+    } else if (error.message?.includes('API key')) {
+      throw new Error('Invalid Gemini API key. Please check your .env file.');
+    } else if (error.message?.includes('quota')) {
+      throw new Error('Gemini API quota exceeded. Please check your API usage limits.');
+    } else if (error.message?.includes('400')) {
+      throw new Error('Invalid request to Gemini API. The file format may not be supported.');
+    } else {
+      throw new Error(`Failed to analyze DPR: ${error.message || 'Unknown error'}`);
+    }
   }
 }

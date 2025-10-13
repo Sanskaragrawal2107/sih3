@@ -1,5 +1,6 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Upload, FileText } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
@@ -44,8 +45,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         onDragOver={handleDragOver}
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           disabled
-            ? 'border-gray-600 bg-gray-800 cursor-not-allowed'
-            : 'border-blue-500 bg-gray-900 hover:bg-gray-800 cursor-pointer'
+            ? 'border-muted-foreground/25 bg-muted cursor-not-allowed'
+            : 'border-primary/50 bg-background hover:bg-muted/50 cursor-pointer'
         }`}
       >
         <input
@@ -62,31 +63,35 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             disabled ? 'cursor-not-allowed' : 'cursor-pointer'
           }`}
         >
-          <Upload className="w-12 h-12 text-blue-400 mb-4" />
-          <p className="text-lg font-semibold text-gray-200 mb-2">
+          <Upload className="w-12 h-12 text-primary mb-4" />
+          <p className="text-lg font-semibold text-foreground mb-2">
             {selectedFile ? 'File Selected' : 'Upload DPR Document'}
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Drag and drop or click to browse
           </p>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Supports PDF, DOCX, and TXT files
           </p>
         </label>
       </div>
 
       {selectedFile && (
-        <div className="mt-4 p-4 bg-gray-800 rounded-lg flex items-center gap-3">
-          <FileText className="w-6 h-6 text-blue-400" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-200">
-              {selectedFile.name}
-            </p>
-            <p className="text-xs text-gray-400">
-              {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-            </p>
-          </div>
-        </div>
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <FileText className="w-6 h-6 text-primary" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  {selectedFile.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

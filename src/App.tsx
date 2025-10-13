@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { FileUpload } from './components/FileUpload';
-import { AnalysisResults } from './components/AnalysisResults';
+import { TabbedAnalysis } from './components/TabbedAnalysis';
+import { GovHeader } from './components/GovHeader';
 import { getMDoNERGuidelines } from './services/llamaCloud';
 import { analyzeDPRWithGemini } from './services/gemini';
+import { getMaterialPricesFromDPR } from './services/materialPrices';
+import { performComprehensiveAudit } from './services/comprehensiveAuditor';
+import { useLanguage } from './contexts/LanguageContext';
 import { AnalysisState } from './types';
-import { Loader2, Mountain, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, FileCheck, CheckCircle, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -13,8 +22,13 @@ function App() {
     isComplete: false,
     analysis: null,
     error: null,
+    materialPrices: [],
+    isFetchingPrices: false,
+    comprehensiveAudit: null,
+    isPerformingAudit: false,
   });
   const [progress, setProgress] = useState<string>('');
+  const { t, language } = useLanguage();
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -29,46 +43,84 @@ function App() {
   const handleAnalyze = async () => {
     if (!selectedFile) return;
 
-    setAnalysisState({
-      isAnalyzing: true,
-      isComplete: false,
-      analysis: null,
-      error: null,
-    });
-
     try {
-      // Step 1: Retrieve guidelines
-      setProgress('📚 Retrieving MDoNER guidelines from LlamaCloud...');
-      const guidelinesQuery = `
-        MDoNER PM-DevINE guidelines for DPR evaluation including:
-        - Budget requirements and cost estimation guidelines
-        - Project timeline and scheduling requirements
-        - Technical feasibility criteria
-        - Environmental impact assessment requirements
-        - Resource allocation guidelines
-        - Mandatory documentation and sections
-        - Compliance requirements
-      `;
+      // Check file size (warn if > 10MB)
+      const fileSizeMB = selectedFile.size / (1024 * 1024);
+      if (fileSizeMB > 10) {
+        const proceed = window.confirm(
+          `Warning: Your file is ${fileSizeMB.toFixed(1)}MB. Large files may take longer to analyze or timeout.\n\nRecommendation: Files under 10MB work best.\n\nDo you want to proceed anyway?`
+        );
+        if (!proceed) return;
+      }
 
+      setAnalysisState({
+        isAnalyzing: true,
+        isComplete: false,
+        analysis: null,
+        error: null,
+      });
+
+      // Step 1: Retrieve guidelines
+      setProgress('📚 Retrieving MDoNER guidelines from knowledge base...');
       let guidelinesText: string;
       try {
-        guidelinesText = await getMDoNERGuidelines(guidelinesQuery);
+        guidelinesText = await getMDoNERGuidelines(
+          'PM-DevINE scheme guidelines for DPR evaluation'
+        );
       } catch (error) {
         console.warn('Could not retrieve guidelines, using fallback');
         guidelinesText = 'General MDoNER project evaluation criteria';
       }
 
       // Step 2: Analyze DPR
-      setProgress('🤖 Analyzing DPR with Gemini 2.5 Flash (this may take a minute)...');
-      const analysis = await analyzeDPRWithGemini(selectedFile, guidelinesText);
+      setProgress('🔍 Analyzing DPR document (this may take a minute)...');
+      const analysis = await analyzeDPRWithGemini(selectedFile, guidelinesText, language);
 
       setAnalysisState({
         isAnalyzing: false,
         isComplete: true,
         analysis,
         error: null,
+        materialPrices: [],
+        isFetchingPrices: false,
       });
       setProgress('');
+
+      // Fetch material prices in background (non-blocking)
+      if (selectedFile) {
+        setAnalysisState(prev => ({ ...prev, isFetchingPrices: true }));
+        
+        const fileText = await selectedFile.text();
+        
+        // Material prices
+        getMaterialPricesFromDPR(selectedFile)
+          .then(prices => {
+            setAnalysisState(prev => ({
+              ...prev,
+              materialPrices: prices,
+              isFetchingPrices: false,
+            }));
+          })
+          .catch(err => {
+            console.error('Error fetching material prices:', err);
+            setAnalysisState(prev => ({ ...prev, isFetchingPrices: false }));
+          });
+
+        // Comprehensive audit (parallel)
+        setAnalysisState(prev => ({ ...prev, isPerformingAudit: true }));
+        performComprehensiveAudit(fileText, analysis)
+          .then(auditReport => {
+            setAnalysisState(prev => ({
+              ...prev,
+              comprehensiveAudit: auditReport,
+              isPerformingAudit: false,
+            }));
+          })
+          .catch(err => {
+            console.error('Error performing comprehensive audit:', err);
+            setAnalysisState(prev => ({ ...prev, isPerformingAudit: false }));
+          });
+      }
     } catch (error) {
       console.error('Analysis error:', error);
       setAnalysisState({
@@ -81,138 +133,119 @@ function App() {
     }
   };
 
-  const checkApiKeys = () => {
-    const llamaKey = import.meta.env.VITE_LLAMA_API_KEY;
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    return { llamaKey: !!llamaKey, geminiKey: !!geminiKey };
-  };
-
-  const apiStatus = checkApiKeys();
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      {/* Government Header */}
+      <GovHeader />
+
+      {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Mountain className="w-12 h-12 text-blue-400" />
-            <h1 className="text-4xl font-bold text-white">
-              DPR Evaluation Platform
-            </h1>
-          </div>
-          <p className="text-xl text-gray-300">
-            Ministry of Development of North Eastern Region (MDoNER)
-          </p>
-          <p className="text-sm text-gray-400 mt-2">
-            AI-powered evaluation of Detailed Project Reports for compliance with MDoNER guidelines
-          </p>
-        </div>
+        {/* File Upload Section */}
+        {!analysisState.isComplete && (
+          <Card className="max-w-3xl mx-auto shadow-xl border-2 border-blue-200">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                <FileCheck className="w-6 h-6" />
+                {t('uploadTitle')}
+              </CardTitle>
+              <CardDescription className="text-blue-100">
+                {t('uploadDescription')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <FileUpload onFileSelect={handleFileSelect} selectedFile={selectedFile} />
+              
+              {selectedFile && (
+                <div className="mt-6 space-y-4">
+                  <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                    <p className="text-sm font-semibold text-green-800 mb-2">
+                      ✅ {t('fileSelected')}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <strong>Name:</strong> {selectedFile.name}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <strong>Size:</strong> {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </p>
+                  </div>
 
-        {/* API Status Sidebar */}
-        <div className="max-w-6xl mx-auto mb-6">
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-gray-300 mb-2">⚙️ Configuration Status</h3>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-2">
-                {apiStatus.llamaKey ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span className="text-sm text-gray-300">LlamaCloud API</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {apiStatus.geminiKey ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span className="text-sm text-gray-300">Gemini API</span>
-              </div>
-            </div>
-            {(!apiStatus.llamaKey || !apiStatus.geminiKey) && (
-              <p className="text-xs text-orange-400 mt-2">
-                ⚠️ Please configure your API keys in the .env file
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-6xl mx-auto">
-          {/* File Upload Section */}
-          <div className="bg-gray-800 rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-white mb-4">📤 Upload DPR Document</h2>
-            <FileUpload
-              onFileSelect={handleFileSelect}
-              selectedFile={selectedFile}
-              disabled={analysisState.isAnalyzing}
-            />
-
-            {selectedFile && !analysisState.isAnalyzing && !analysisState.isComplete && (
-              <button
-                onClick={handleAnalyze}
-                disabled={!apiStatus.llamaKey || !apiStatus.geminiKey}
-                className="mt-6 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                🔍 Analyze DPR
-              </button>
-            )}
-          </div>
-
-          {/* Progress Indicator */}
-          {analysisState.isAnalyzing && (
-            <div className="bg-gray-800 rounded-lg p-6 mb-6">
-              <div className="flex items-center justify-center gap-3">
-                <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-                <p className="text-gray-300">{progress}</p>
-              </div>
-              <div className="mt-4 w-full bg-gray-700 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full animate-pulse w-2/3"></div>
-              </div>
-            </div>
-          )}
-
-          {/* Error Display */}
-          {analysisState.error && (
-            <div className="bg-red-900/30 border border-red-500 rounded-lg p-6 mb-6">
-              <div className="flex items-start gap-3">
-                <XCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="text-lg font-semibold text-red-400 mb-2">
-                    Analysis Failed
-                  </h3>
-                  <p className="text-gray-300">{analysisState.error}</p>
-                  <button
-                    onClick={() => setAnalysisState({ ...analysisState, error: null })}
-                    className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={analysisState.isAnalyzing}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-6 text-lg shadow-lg"
                   >
-                    Try Again
-                  </button>
+                    {analysisState.isAnalyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {t('analyzing')}
+                      </>
+                    ) : (
+                      <>
+                        <FileCheck className="mr-2 h-5 w-5" />
+                        {t('analyzeButton')}
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Analysis Results */}
-          {analysisState.isComplete && analysisState.analysis && (
-            <div>
-              <div className="bg-green-900/30 border border-green-500 rounded-lg p-4 mb-6 flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-                <p className="text-green-300 font-semibold">
-                  ✅ Analysis Complete!
+        {/* Progress Indicator */}
+        {analysisState.isAnalyzing && (
+          <Card className="max-w-3xl mx-auto mt-6 shadow-xl border-2 border-blue-300">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="w-16 h-16 text-blue-600 animate-spin mb-4" />
+                <p className="text-lg font-semibold text-gray-800 mb-2">{progress}</p>
+                <Progress value={undefined} className="w-full max-w-md h-2" />
+                <p className="text-sm text-gray-600 mt-4">
+                  This may take 1-2 minutes depending on document size...
                 </p>
               </div>
-              <AnalysisResults analysis={analysisState.analysis} />
-            </div>
-          )}
-        </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Error Display */}
+        {analysisState.error && (
+          <Alert variant="destructive" className="max-w-3xl mx-auto mt-6 border-2">
+            <XCircle className="h-5 w-5" />
+            <AlertDescription className="text-base">
+              <strong>Analysis Failed:</strong> {analysisState.error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Analysis Results */}
+        {analysisState.isComplete && analysisState.analysis && (
+          <div className="mt-6">
+            <Alert className="mb-6 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950 shadow-lg">
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-200 font-semibold text-base">
+                ✅ Analysis Complete! Your DPR evaluation is ready.
+              </AlertDescription>
+            </Alert>
+            
+            <TabbedAnalysis 
+              analysis={analysisState.analysis} 
+              materialPrices={analysisState.materialPrices || []}
+              isFetchingPrices={analysisState.isFetchingPrices || false}
+              comprehensiveAudit={analysisState.comprehensiveAudit || null}
+              isPerformingAudit={analysisState.isPerformingAudit || false}
+            />
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="text-center mt-12 text-gray-500 text-sm">
+        <div className="text-center mt-12 text-muted-foreground text-sm">
           <p>Built with ❤️ for the development of North Eastern Region</p>
           <p className="mt-2">
-            Powered by LlamaCloud & Gemini 2.5 Flash
+            Ministry of Development of North Eastern Region (MDoNER)
+          </p>
+          <p className="mt-1 text-xs">
+            Government of India | भारत सरकार
           </p>
         </div>
       </div>
