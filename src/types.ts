@@ -76,3 +76,45 @@ export interface AnalysisState {
   comprehensiveAudit?: ComprehensiveAuditReport | null;
   isPerformingAudit?: boolean;
 }
+
+// File Tracking System Types
+export interface Department {
+  id: string;
+  name: string;
+  shortName: string;
+  description: string;
+  icon: string;
+  color: string;
+  avgProcessingTime: string;
+}
+
+export interface FileAction {
+  id: string;
+  departmentId: string;
+  action: string;
+  performedBy: string;
+  timestamp: Date;
+  message: string;
+  status: 'pending' | 'completed' | 'rejected' | 'on_hold';
+  documents?: string[];
+  remarks?: string;
+}
+
+export interface FileSubmission {
+  id: string;
+  fileName: string;
+  projectName: string;
+  submittedBy: string;
+  submissionDate: Date;
+  fileType: 'DPR' | 'EIA' | 'Land_Document' | 'Financial_Document' | 'Technical_Drawing';
+  currentDepartment: string;
+  status: 'submitted' | 'under_review' | 'approved' | 'rejected' | 'requires_modification' | 'on_hold';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  estimatedCompletionDate?: Date;
+  totalEstimatedDays: number;
+  daysInCurrentDepartment: number;
+  timeline: FileAction[];
+  documents: string[];
+  budget?: number;
+  location?: string;
+}
