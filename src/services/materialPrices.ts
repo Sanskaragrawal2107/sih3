@@ -220,10 +220,10 @@ Return ONLY valid JSON, nothing else.
       // Add delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error(`Error fetching price for ${material}:`, error);
+      console.error(`Error fetching price for ${typeof item === 'string' ? item : item.material}:`, error);
       // Add placeholder data if fetch fails
       prices.push({
-        material,
+        material: typeof item === 'string' ? item : item.material,
         currentPrice: 'N/A',
         unit: 'N/A',
         source: 'Price unavailable',

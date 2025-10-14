@@ -17,8 +17,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      external: [
+        '@xenova/transformers',
+        'llamaindex',
+        'chromadb',
+        'mongodb',
+        'google-auth-library',
+        'weaviate-client'
+      ]
+    }
+  },
   optimizeDeps: {
     include: ['process/browser', 'buffer', 'util', 'js-tiktoken'],
+    exclude: ['llamaindex', 'chromadb', '@xenova/transformers'],
     esbuildOptions: {
       define: {
         global: 'globalThis',

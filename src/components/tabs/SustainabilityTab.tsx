@@ -1,29 +1,40 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Leaf, Droplets, Zap, Recycle, TreePine, Wind, Sun, Factory } from 'lucide-react';
-import { useLanguage } from '../../contexts/LanguageContext';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
+  ResponsiveContainer,
   LineChart,
   Line,
-} from 'recharts';
+  Legend,
+} from "recharts";
+import { 
+  Leaf, 
+  TreePine, 
+  Factory, 
+  Wind, 
+  Droplets, 
+  Sun, 
+  Recycle, 
+  Zap 
+} from "lucide-react";
 
 export const SustainabilityTab: React.FC = () => {
-  const { t } = useLanguage();
 
   // Mock ESG Scores
   const esgOverallScore = 78;
@@ -82,12 +93,6 @@ export const SustainabilityTab: React.FC = () => {
     carbonOffset: '1,590 tonnes CO2/year',
     netEmissions: '860 tonnes CO2/year',
     equivalentTrees: '39,090 trees planted',
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 bg-green-50 border-green-200';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    return 'text-red-600 bg-red-50 border-red-200';
   };
 
   const getScoreBadge = (score: number) => {
