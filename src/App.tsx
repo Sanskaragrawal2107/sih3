@@ -2,6 +2,8 @@ import { useState } from "react";
 import { FileUpload } from "./components/FileUpload";
 import { TabbedAnalysis } from "./components/TabbedAnalysis";
 import FileTrackingSystem from "./components/FileTrackingSystem";
+import HomePage from "./components/HomePage";
+import { SustainabilityTab } from "./components/tabs/SustainabilityTab";
 import { getMDoNERGuidelines } from "./services/llamaCloud";
 import { analyzeDPRWithGemini } from "./services/gemini";
 import { getMaterialPricesFromDPR } from "./services/materialPrices";
@@ -23,6 +25,9 @@ import {
   Languages,
   Globe,
   Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Leaf,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,11 +41,6 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -49,9 +49,6 @@ import {
 
 function AppContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [activeView, setActiveView] = useState<
-    "dashboard" | "dpr-analysis" | "file-tracking" | "reports" | "settings"
-  >("dpr-analysis");
   const [analysisState, setAnalysisState] = useState<AnalysisState>({
     isAnalyzing: false,
     isComplete: false,
@@ -62,8 +59,10 @@ function AppContent() {
     comprehensiveAudit: null,
     isPerformingAudit: false,
   });
-  const [progress, setProgress] = useState<string>("");
+  const [progress, setProgress] = useState<string>('');
   const { t, language, setLanguage } = useLanguage();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeView, setActiveView] = useState<string>("dashboard");
   const { setAnalysisData, setFileName } = useChatContext();
 
   const handleFileSelect = (file: File) => {
@@ -182,6 +181,15 @@ function AppContent() {
     }
   };
 
+  // If on home page, show full-screen homepage
+  if (activeView === "home") {
+    return (
+      <>
+        <HomePage onNavigateToDashboard={() => setActiveView("dashboard")} />
+      </>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-green-50">
       {/* Top Header Bar */}
@@ -246,18 +254,37 @@ function AppContent() {
 
       {/* Main Layout with Resizable Panels */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+        <div className="flex h-full">
           {/* Sidebar */}
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-            <div className="h-full bg-white border-r border-gray-200 shadow-sm">
+          {!isSidebarCollapsed && (
+            <div className="w-64 bg-white border-r border-gray-200 shadow-sm flex-shrink-0">
               <div className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-semibold text-gray-700">Navigation</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsSidebarCollapsed(true)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </div>
                 <nav className="space-y-2">
+                  <Button
+                    variant={activeView === "home" ? "default" : "ghost"}
+                    className="w-full justify-start text-left hover:bg-blue-50"
+                    onClick={() => setActiveView("home")}
+                  >
+                    <Home className="w-4 h-4 mr-3" />
+                    Home
+                  </Button>
                   <Button
                     variant={activeView === "dashboard" ? "default" : "ghost"}
                     className="w-full justify-start text-left hover:bg-blue-50"
                     onClick={() => setActiveView("dashboard")}
                   >
-                    <Home className="w-4 h-4 mr-3" />
+                    <BarChart3 className="w-4 h-4 mr-3" />
                     Dashboard
                   </Button>
                   <Button
@@ -289,6 +316,14 @@ function AppContent() {
                     Reports
                   </Button>
                   <Button
+                    variant={activeView === "sustainability" ? "default" : "ghost"}
+                    className="w-full justify-start text-left hover:bg-green-50"
+                    onClick={() => setActiveView("sustainability")}
+                  >
+                    <Leaf className="w-4 h-4 mr-3 text-green-600" />
+                    Sustainability
+                  </Button>
+                  <Button
                     variant={activeView === "settings" ? "default" : "ghost"}
                     className="w-full justify-start text-left hover:bg-blue-50"
                     onClick={() => setActiveView("settings")}
@@ -299,81 +334,175 @@ function AppContent() {
                 </nav>
               </div>
             </div>
-          </ResizablePanel>
+          )}
 
-          <ResizableHandle />
+          {/* Collapsed Sidebar - Expand Button */}
+          {isSidebarCollapsed && (
+            <div className="w-12 bg-white border-r border-gray-200 shadow-sm flex-shrink-0 flex flex-col items-center py-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="h-10 w-10 p-0 mb-4"
+                title="Expand Sidebar"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
 
           {/* Main Content Area */}
-          <ResizablePanel defaultSize={80}>
-            <div className="h-full overflow-auto">
-              <div className="p-6 space-y-6">
-                {/* Conditional Content Based on Active View */}
-                {activeView === "file-tracking" && <FileTrackingSystem />}
+          <div className="flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <div className="p-6 space-y-6">
+              {/* Conditional Content Based on Active View */}
+              {activeView === "file-tracking" && <FileTrackingSystem />}
 
-                {activeView === "dashboard" && (
-                  <Card className="shadow-xl border-2 border-blue-200">
-                    <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                      <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                        <Home className="w-6 h-6" />
-                        Dashboard
-                      </CardTitle>
-                      <CardDescription className="text-blue-100">
-                        Government DPR Analysis System Overview
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-12">
-                        <p className="text-gray-600">
-                          Dashboard content coming soon...
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {activeView === "reports" && (
+              {activeView === "dashboard" && (
+                <div className="space-y-6">
                   <Card className="shadow-xl border-2 border-blue-200">
                     <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
                       <CardTitle className="text-2xl font-bold flex items-center gap-2">
                         <BarChart3 className="w-6 h-6" />
-                        Reports
+                        Project Dashboard
                       </CardTitle>
                       <CardDescription className="text-blue-100">
-                        Analysis Reports and Statistics
+                        Real-time overview of all DPR submissions and approvals
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-12">
-                        <p className="text-gray-600">
-                          Reports section coming soon...
-                        </p>
-                      </div>
-                    </CardContent>
                   </Card>
-                )}
 
-                {activeView === "settings" && (
-                  <Card className="shadow-xl border-2 border-blue-200">
-                    <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                      <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                        <Settings className="w-6 h-6" />
-                        Settings
-                      </CardTitle>
-                      <CardDescription className="text-blue-100">
-                        System Configuration and Preferences
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-12">
-                        <p className="text-gray-600">
-                          Settings section coming soon...
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="border-2 border-blue-100 hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-600">Total Projects</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-blue-600">24</div>
+                        <p className="text-xs text-gray-500 mt-1">+3 this month</p>
+                      </CardContent>
+                    </Card>
 
-                {activeView === "dpr-analysis" && (
+                    <Card className="border-2 border-green-100 hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-600">Approved</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-green-600">12</div>
+                        <p className="text-xs text-gray-500 mt-1">50% success rate</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-yellow-100 hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-600">Under Review</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-yellow-600">8</div>
+                        <p className="text-xs text-gray-500 mt-1">33% in progress</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-purple-100 hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-600">AI Interventions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-purple-600">15</div>
+                        <p className="text-xs text-gray-500 mt-1">Delays prevented</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <Card className="hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setActiveView("dpr-analysis")}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                          Analyze New DPR
+                        </CardTitle>
+                        <CardDescription>
+                          Upload and analyze a new project report
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+
+                    <Card className="hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setActiveView("file-tracking")}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Search className="w-5 h-5 text-green-600" />
+                          Track Files
+                        </CardTitle>
+                        <CardDescription>
+                          Monitor approval progress and status
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+
+                    <Card className="hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setActiveView("reports")}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-purple-600" />
+                          View Reports
+                        </CardTitle>
+                        <CardDescription>
+                          Access analytics and insights
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  </div>
+                </div>
+              )}
+
+              {activeView === "reports" && (
+                <Card className="shadow-xl border-2 border-blue-200">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                    <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                      <BarChart3 className="w-6 h-6" />
+                      Reports
+                    </CardTitle>
+                    <CardDescription className="text-blue-100">
+                      Analysis Reports and Statistics
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-12">
+                      <p className="text-gray-600">
+                        Reports section coming soon...
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeView === "sustainability" && (
+                <SustainabilityTab />
+              )}
+
+              {activeView === "settings" && (
+                <Card className="shadow-xl border-2 border-blue-200">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                    <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                      <Settings className="w-6 h-6" />
+                      Settings
+                    </CardTitle>
+                    <CardDescription className="text-blue-100">
+                      System Configuration and Preferences
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-12">
+                      <p className="text-gray-600">
+                        Settings section coming soon...
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeView === "dpr-analysis" && (
                   <>
                     {/* File Upload Section */}
                     {!analysisState.isComplete && (
@@ -510,8 +639,8 @@ function AppContent() {
                 )}
               </div>
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        </div>
       </div>
       <ChatBubble />
     </div>

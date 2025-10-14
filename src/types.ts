@@ -88,6 +88,14 @@ export interface Department {
   avgProcessingTime: string;
 }
 
+export interface AICommunication {
+  type: 'call' | 'sms' | 'email' | 'whatsapp';
+  timestamp: Date;
+  recipient: string;
+  summary: string;
+  status: 'pending' | 'delivered' | 'completed' | 'failed';
+}
+
 export interface FileAction {
   id: string;
   departmentId: string;
@@ -98,6 +106,7 @@ export interface FileAction {
   status: 'pending' | 'completed' | 'rejected' | 'on_hold';
   documents?: string[];
   remarks?: string;
+  aiCommunication?: AICommunication;
 }
 
 export interface FileSubmission {

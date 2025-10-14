@@ -12,6 +12,10 @@ import {
   User,
   FileSearch,
   TrendingUp,
+  MessageSquare,
+  Bot,
+  PhoneCall,
+  Mail,
 } from "lucide-react";
 import {
   Table,
@@ -110,11 +114,11 @@ const mockFileSubmissions: FileSubmission[] = [
     submissionDate: new Date("2024-01-15"),
     fileType: "DPR",
     currentDepartment: "environment",
-    status: "under_review",
+    status: "on_hold",
     priority: "high",
     estimatedCompletionDate: new Date("2024-02-28"),
     totalEstimatedDays: 45,
-    daysInCurrentDepartment: 12,
+    daysInCurrentDepartment: 18,
     budget: 15000000,
     location: "Guwahati, Assam",
     documents: ["DPR_Main.pdf", "Technical_Drawings.pdf", "Cost_Estimate.xlsx"],
@@ -152,14 +156,21 @@ const mockFileSubmissions: FileSubmission[] = [
       {
         id: "4",
         departmentId: "environment",
-        action: "Environmental Assessment In Progress",
+        action: "Environmental Assessment - DELAYED",
         performedBy: "Dr. Kishan Singh",
         timestamp: new Date("2024-02-05T09:00:00"),
         message:
           "Environmental impact assessment is underway. Waiting for soil and water quality reports.",
         status: "pending",
         remarks:
-          "Additional wildlife clearance required due to nearby forest area",
+          "⚠️ DELAY ALERT: Exceeded 14-day SLA by 4 days. AI Agent initiated contact.",
+        aiCommunication: {
+          type: "call",
+          timestamp: new Date("2024-02-19T14:30:00"),
+          recipient: "Dr. Kishan Singh (Environmental Dept Head)",
+          summary: "AI Agent called department head. Reason for delay: Awaiting wildlife clearance report from external agency. Expected completion: 3 days. Department head confirmed priority escalation.",
+          status: "completed",
+        },
       },
     ],
   },
@@ -171,11 +182,11 @@ const mockFileSubmissions: FileSubmission[] = [
     submissionDate: new Date("2024-02-01"),
     fileType: "DPR",
     currentDepartment: "finance",
-    status: "under_review",
+    status: "requires_modification",
     priority: "medium",
     estimatedCompletionDate: new Date("2024-03-15"),
     totalEstimatedDays: 35,
-    daysInCurrentDepartment: 8,
+    daysInCurrentDepartment: 9,
     budget: 8500000,
     location: "Jorhat, Assam",
     documents: ["School_DPR.pdf", "Site_Plan.pdf", "Financial_Estimate.xlsx"],
@@ -202,12 +213,20 @@ const mockFileSubmissions: FileSubmission[] = [
       {
         id: "3",
         departmentId: "finance",
-        action: "Budget Verification In Progress",
+        action: "Budget Verification - Modifications Required",
         performedBy: "CA. Ravi Gupta",
         timestamp: new Date("2024-02-10T10:30:00"),
         message:
-          "Reviewing cost estimates and material specifications for budget compliance.",
+          "Material costs exceed market rates by 18%. Requires revision and resubmission with justified pricing.",
         status: "pending",
+        remarks: "Cement pricing at ₹425/bag vs market rate ₹350/bag. Steel at ₹68,000/ton vs ₹58,000/ton market rate.",
+        aiCommunication: {
+          type: "sms",
+          timestamp: new Date("2024-02-18T09:15:00"),
+          recipient: "Mukesh Agarwal (Contractor)",
+          summary: "SMS sent to contractor: Finance dept requires material cost revision. Current pricing 18% above market. Please resubmit with corrected BOQ within 5 days.",
+          status: "delivered",
+        },
       },
     ],
   },
@@ -413,7 +432,68 @@ const TimelineView: React.FC<TimelineViewProps> = ({ file }) => {
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Modern Progress Bar Timeline */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          {departments.map((dept, index) => {
+            const isCompleted = file.timeline.some(
+              (action) =>
+                action.departmentId === dept.id && action.status === "completed"
+            );
+            const isPending = file.timeline.some(
+              (action) =>
+                action.departmentId === dept.id && action.status === "pending"
+            );
+            const isCurrent = dept.id === file.currentDepartment;
+
+            return (
+              <div key={dept.id} className="flex-1 flex flex-col items-center">
+                <div className="relative w-full flex items-center">
+                  {/* Connecting Line */}
+                  {index > 0 && (
+                    <div
+                      className={`absolute right-1/2 w-full h-1 -z-10 ${
+                        isCompleted ? "bg-blue-500" : "bg-gray-200"
+                      }`}
+                      style={{ right: "50%", width: "100%" }}
+                    />
+                  )}
+                  
+                  {/* Status Circle */}
+                  <div
+                    className={`relative z-10 mx-auto w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all ${
+                      isCompleted
+                        ? "bg-blue-500 border-blue-200 shadow-lg"
+                        : isPending || isCurrent
+                        ? "bg-blue-400 border-blue-300 shadow-md animate-pulse"
+                        : "bg-gray-200 border-gray-300"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    ) : isPending || isCurrent ? (
+                      <Clock className="w-6 h-6 text-white" />
+                    ) : (
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Department Label */}
+                <div className="mt-3 text-center">
+                  <p className={`text-xs font-semibold ${
+                    isCurrent ? "text-blue-700" : "text-gray-600"
+                  }`}>
+                    {dept.shortName}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Detailed Timeline Cards */}
       <div className="relative">
         <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
 
@@ -501,6 +581,40 @@ const TimelineView: React.FC<TimelineViewProps> = ({ file }) => {
                         {relevantAction.remarks && (
                           <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
                             <strong>Remarks:</strong> {relevantAction.remarks}
+                          </div>
+                        )}
+                        {relevantAction.aiCommunication && (
+                          <div className="mt-3 p-3 bg-purple-50 border-2 border-purple-200 rounded-lg">
+                            <div className="flex items-start gap-2 mb-2">
+                              <Bot className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-purple-900 text-sm">
+                                    AI Communication Agent
+                                  </span>
+                                  <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                    {relevantAction.aiCommunication.type === 'call' && (
+                                      <><PhoneCall className="w-3 h-3 mr-1" />Call</>
+                                    )}
+                                    {relevantAction.aiCommunication.type === 'sms' && (
+                                      <><MessageSquare className="w-3 h-3 mr-1" />SMS</>
+                                    )}
+                                    {relevantAction.aiCommunication.type === 'email' && (
+                                      <><Mail className="w-3 h-3 mr-1" />Email</>
+                                    )}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-purple-800 mb-1">
+                                  <strong>To:</strong> {relevantAction.aiCommunication.recipient}
+                                </p>
+                                <p className="text-xs text-purple-800 mb-1">
+                                  <strong>Time:</strong> {relevantAction.aiCommunication.timestamp.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-gray-700 mt-2 leading-relaxed">
+                                  {relevantAction.aiCommunication.summary}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
