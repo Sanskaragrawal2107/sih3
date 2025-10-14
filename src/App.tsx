@@ -7,6 +7,8 @@ import { analyzeDPRWithGemini } from "./services/gemini";
 import { getMaterialPricesFromDPR } from "./services/materialPrices";
 import { performComprehensiveAudit } from "./services/comprehensiveAuditor";
 import { useLanguage } from "./contexts/LanguageContext";
+import { ChatProvider, useChatContext } from "./contexts/ChatContext";
+import ChatBubble from "./components/Chat-Bubble";
 import { AnalysisState } from "./types";
 import {
   Loader2,
@@ -45,7 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-function App() {
+function AppContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeView, setActiveView] = useState<
     "dashboard" | "dpr-analysis" | "file-tracking" | "reports" | "settings"
@@ -62,6 +64,7 @@ function App() {
   });
   const [progress, setProgress] = useState<string>("");
   const { t, language, setLanguage } = useLanguage();
+  const { setAnalysisData, setFileName } = useChatContext();
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -124,6 +127,10 @@ function App() {
         isFetchingPrices: false,
       });
       setProgress("");
+
+      // Update chat context with analysis data
+      setAnalysisData(analysis);
+      setFileName(selectedFile.name);
 
       // Fetch material prices in background (non-blocking)
       if (selectedFile) {
@@ -506,7 +513,16 @@ function App() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+      <ChatBubble />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ChatProvider>
+      <AppContent />
+    </ChatProvider>
   );
 }
 
