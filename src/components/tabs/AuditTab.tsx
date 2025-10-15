@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, AlertTriangle, Info, Shield } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield, CheckCircle2, Clock, TrendingUp, CloudRain, Users, Package, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ComprehensiveAuditReport, VerificationIssue } from '../../types';
+import { ComprehensiveAuditReport } from '../../types';
 
 interface AuditTabProps {
   comprehensiveAudit: ComprehensiveAuditReport | null;
@@ -37,73 +37,6 @@ export const AuditTab: React.FC<AuditTabProps> = ({
       </div>
     );
   }
-
-  const getRiskColor = (riskLevel: string) => {
-    switch (riskLevel) {
-      case 'critical':
-        return 'border-red-500 bg-red-50 dark:bg-red-950/30';
-      case 'high':
-        return 'border-orange-500 bg-orange-50 dark:bg-orange-950/30';
-      case 'medium':
-        return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30';
-      default:
-        return 'border-blue-500 bg-blue-50 dark:bg-blue-950/30';
-    }
-  };
-
-  const getRiskBadge = (riskLevel: string) => {
-    const variants: Record<string, any> = {
-      critical: 'destructive',
-      high: 'destructive',
-      medium: 'secondary',
-      low: 'outline',
-    };
-    return variants[riskLevel] || 'outline';
-  };
-
-  const VerificationIssueCard: React.FC<{ issue: VerificationIssue }> = ({ issue }) => (
-    <Card className={`${getRiskColor(issue.riskLevel)} border-2`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant={getRiskBadge(issue.riskLevel)} className="text-sm px-3 py-1">
-                {issue.riskLevel.toUpperCase()}
-              </Badge>
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {issue.category}
-              </Badge>
-            </div>
-            <CardTitle className="text-base font-bold">{issue.discrepancy}</CardTitle>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <h5 className="font-bold text-sm mb-1">📋 Claim in Document:</h5>
-          <p className="text-sm text-muted-foreground pl-4 border-l-2 border-gray-300">{issue.claim}</p>
-        </div>
-        {issue.verifiedValue && (
-          <div>
-            <h5 className="font-bold text-sm mb-1">✅ Verified Value:</h5>
-            <p className="text-sm text-muted-foreground pl-4 border-l-2 border-green-300">{issue.verifiedValue}</p>
-          </div>
-        )}
-        <Separator />
-        <div>
-          <h5 className="font-bold text-sm mb-1">💡 Explanation:</h5>
-          <p className="text-sm pl-4 border-l-2 border-blue-300">{issue.explanation}</p>
-        </div>
-        <div>
-          <h5 className="font-bold text-sm mb-1 text-primary">🎯 Recommendation:</h5>
-          <p className="text-sm pl-4 border-l-2 border-primary">{issue.recommendation}</p>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          <strong>Source:</strong> {issue.source}
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <div className="space-y-6">
@@ -245,18 +178,262 @@ export const AuditTab: React.FC<AuditTabProps> = ({
         </Card>
       </div>
 
-      {/* Detailed Verification Issues */}
-      {comprehensiveAudit.verificationIssues.length > 0 && (
+      {/* Guideline Recommendations */}
+      {comprehensiveAudit.guidelineRecommendations && comprehensiveAudit.guidelineRecommendations.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <Info className="w-6 h-6" />
-            {t('verificationIssues')} ({comprehensiveAudit.verificationIssues.length})
+            <CheckCircle2 className="w-6 h-6 text-blue-600" />
+            Guideline Compliance & Recommendations ({comprehensiveAudit.guidelineRecommendations.length})
           </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Analysis of DPR compliance with MDoNER/PM-DevINE guidelines and actionable recommendations
+          </p>
           <div className="space-y-4">
-            {comprehensiveAudit.verificationIssues.map((issue, idx) => (
-              <VerificationIssueCard key={idx} issue={issue} />
+            {comprehensiveAudit.guidelineRecommendations.map((rec, idx) => (
+              <Card key={idx} className={`border-2 ${
+                rec.priority === 'critical' ? 'border-red-500 bg-red-50' :
+                rec.priority === 'high' ? 'border-orange-500 bg-orange-50' :
+                rec.priority === 'medium' ? 'border-yellow-500 bg-yellow-50' :
+                'border-blue-500 bg-blue-50'
+              }`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant={rec.priority === 'critical' || rec.priority === 'high' ? 'destructive' : 'secondary'} className="text-sm px-3 py-1">
+                          {rec.priority.toUpperCase()}
+                        </Badge>
+                        <Badge variant={
+                          rec.currentStatus === 'compliant' ? 'default' :
+                          rec.currentStatus === 'partial' ? 'secondary' :
+                          'destructive'
+                        } className="text-sm px-3 py-1">
+                          {rec.currentStatus === 'compliant' ? '✓ Compliant' :
+                           rec.currentStatus === 'partial' ? '⚠ Partial' :
+                           rec.currentStatus === 'non-compliant' ? '✗ Non-Compliant' :
+                           '? Missing'}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-base font-bold">{rec.guidelineReference}</CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <h5 className="font-bold text-sm mb-1">⚠️ Issue:</h5>
+                    <p className="text-sm text-muted-foreground pl-4 border-l-2 border-gray-300">{rec.issue}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h5 className="font-bold text-sm mb-1 text-primary">💡 Recommendation:</h5>
+                    <p className="text-sm pl-4 border-l-2 border-primary">{rec.recommendation}</p>
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-sm mb-1 text-green-700">🎯 Action Required:</h5>
+                    <p className="text-sm pl-4 border-l-2 border-green-500">{rec.actionRequired}</p>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Feasibility Analysis */}
+      {comprehensiveAudit.feasibilityAnalysis && (
+        <div>
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-purple-600" />
+            Feasibility Analysis
+          </h2>
+          
+          {/* Feasibility Score */}
+          <Card className={`mb-4 border-2 ${
+            comprehensiveAudit.feasibilityAnalysis.overallFeasibility === 'highly-feasible' ? 'border-green-500 bg-green-50' :
+            comprehensiveAudit.feasibilityAnalysis.overallFeasibility === 'feasible' ? 'border-blue-500 bg-blue-50' :
+            comprehensiveAudit.feasibilityAnalysis.overallFeasibility === 'challenging' ? 'border-orange-500 bg-orange-50' :
+            'border-red-500 bg-red-50'
+          }`}>
+            <CardHeader className="pb-3">
+              <CardDescription className="text-sm font-medium">Overall Feasibility</CardDescription>
+              <CardTitle className="text-4xl font-bold capitalize">
+                {comprehensiveAudit.feasibilityAnalysis.overallFeasibility.replace('-', ' ')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Progress value={comprehensiveAudit.feasibilityAnalysis.feasibilityScore} className="h-3 mb-2" />
+              <p className="text-sm font-semibold">
+                Feasibility Score: {comprehensiveAudit.feasibilityAnalysis.feasibilityScore}/100
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Timeline Feasibility */}
+            <Card className="border-2 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Timeline Feasibility
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-2 bg-white rounded border">
+                  <span className="text-sm font-medium">Proposed Duration</span>
+                  <Badge variant="outline">{comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.proposedDuration}</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white rounded border">
+                  <span className="text-sm font-medium">Is Realistic?</span>
+                  {comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.isRealistic ? 
+                    <Badge variant="default" className="bg-green-600">✓ Yes</Badge> : 
+                    <Badge variant="destructive">✗ No</Badge>}
+                </div>
+                <Separator />
+                <div>
+                  <h5 className="font-bold text-sm mb-1 flex items-center gap-1">
+                    <CloudRain className="w-4 h-4" /> Weather Impact:
+                  </h5>
+                  <p className="text-sm text-muted-foreground pl-4 border-l-2 border-blue-300">
+                    {comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.weatherImpact}
+                  </p>
+                </div>
+                {comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.seasonalConstraints.length > 0 && (
+                  <div>
+                    <h5 className="font-bold text-sm mb-1">Seasonal Constraints:</h5>
+                    <ul className="text-sm space-y-1 pl-4">
+                      {comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.seasonalConstraints.map((constraint, idx) => (
+                        <li key={idx} className="text-muted-foreground">• {constraint}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div>
+                  <h5 className="font-bold text-sm mb-1 text-primary">💡 Recommendation:</h5>
+                  <p className="text-sm pl-4 border-l-2 border-primary">
+                    {comprehensiveAudit.feasibilityAnalysis.timelineFeasibility.recommendation}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Resource Availability */}
+            <Card className="border-2 border-green-200">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Resource Availability
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-white rounded border">
+                  <span className="text-sm font-medium flex items-center gap-1">
+                    <Users className="w-4 h-4" /> Labor Available
+                  </span>
+                  {comprehensiveAudit.feasibilityAnalysis.resourceAvailability.laborAvailable ? 
+                    <Badge variant="default" className="bg-green-600">✓ Yes</Badge> : 
+                    <Badge variant="destructive">✗ No</Badge>}
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white rounded border">
+                  <span className="text-sm font-medium">Materials Accessible</span>
+                  {comprehensiveAudit.feasibilityAnalysis.resourceAvailability.materialsAccessible ? 
+                    <Badge variant="default" className="bg-green-600">✓ Yes</Badge> : 
+                    <Badge variant="destructive">✗ No</Badge>}
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white rounded border">
+                  <span className="text-sm font-medium">Equipment Available</span>
+                  {comprehensiveAudit.feasibilityAnalysis.resourceAvailability.equipmentAvailable ? 
+                    <Badge variant="default" className="bg-green-600">✓ Yes</Badge> : 
+                    <Badge variant="destructive">✗ No</Badge>}
+                </div>
+                {comprehensiveAudit.feasibilityAnalysis.resourceAvailability.concerns.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h5 className="font-bold text-sm mb-1 flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4 text-orange-600" /> Concerns:
+                      </h5>
+                      <ul className="text-sm space-y-1 pl-4">
+                        {comprehensiveAudit.feasibilityAnalysis.resourceAvailability.concerns.map((concern, idx) => (
+                          <li key={idx} className="text-muted-foreground">• {concern}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Historical Comparison */}
+          <Card className="border-2 border-purple-200 mb-4">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Historical Comparison (Past Projects)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-white rounded border">
+                  <p className="text-xs text-muted-foreground mb-1">Similar Projects Found</p>
+                  <p className="text-lg font-bold">
+                    {comprehensiveAudit.feasibilityAnalysis.historicalComparison.similarProjectsFound ? '✓ Yes' : '✗ No'}
+                  </p>
+                </div>
+                <div className="p-3 bg-white rounded border">
+                  <p className="text-xs text-muted-foreground mb-1">Average Duration</p>
+                  <p className="text-lg font-bold">{comprehensiveAudit.feasibilityAnalysis.historicalComparison.averageDuration}</p>
+                </div>
+                <div className="p-3 bg-white rounded border">
+                  <p className="text-xs text-muted-foreground mb-1">Success Rate</p>
+                  <p className="text-lg font-bold">{comprehensiveAudit.feasibilityAnalysis.historicalComparison.successRate}</p>
+                </div>
+              </div>
+              {comprehensiveAudit.feasibilityAnalysis.historicalComparison.keyLearnings.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h5 className="font-bold text-sm mb-2">📚 Key Learnings from Past Projects:</h5>
+                    <ul className="text-sm space-y-1 pl-4">
+                      {comprehensiveAudit.feasibilityAnalysis.historicalComparison.keyLearnings.map((learning, idx) => (
+                        <li key={idx} className="text-muted-foreground">• {learning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Risk Factors */}
+          {comprehensiveAudit.feasibilityAnalysis.riskFactors.length > 0 && (
+            <Card className="border-2 border-orange-200">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-600" />
+                  Risk Factors
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {comprehensiveAudit.feasibilityAnalysis.riskFactors.map((risk, idx) => (
+                    <div key={idx} className={`p-3 rounded border-2 ${
+                      risk.impact === 'high' ? 'border-red-300 bg-red-50' :
+                      risk.impact === 'medium' ? 'border-orange-300 bg-orange-50' :
+                      'border-yellow-300 bg-yellow-50'
+                    }`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <h5 className="font-bold text-sm">{risk.factor}</h5>
+                        <Badge variant={risk.impact === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                          {risk.impact.toUpperCase()} IMPACT
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        <strong>Mitigation:</strong> {risk.mitigation}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 

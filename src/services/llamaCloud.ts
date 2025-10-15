@@ -1,5 +1,14 @@
 export async function getMDoNERGuidelines(query: string): Promise<string> {
   try {
+    // Check if LlamaCloud credentials are available
+    const hasCredentials = import.meta.env.VITE_LLAMA_API_KEY && 
+                          import.meta.env.VITE_LLAMA_ORG_ID;
+    
+    if (!hasCredentials) {
+      console.log('LlamaCloud credentials not found, using fallback guidelines');
+      throw new Error('No credentials');
+    }
+    
     // Dynamic import to avoid bundling issues
     const { LlamaCloudIndex } = await import('llamaindex');
     
@@ -25,9 +34,13 @@ export async function getMDoNERGuidelines(query: string): Promise<string> {
       }
     }).filter(text => text.length > 0).join('\n\n');
     
+    if (guidelinesText.trim().length === 0) {
+      throw new Error('No guidelines retrieved');
+    }
+    
     return guidelinesText;
   } catch (error) {
-    console.error('Error retrieving guidelines:', error);
+    console.log('Using fallback guidelines:', error instanceof Error ? error.message : 'Unknown error');
     // Return fallback guidelines instead of throwing
     return `
     MDoNER PM-DevINE Guidelines (Fallback):

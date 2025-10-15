@@ -11,6 +11,44 @@ export interface VerificationIssue {
   recommendation: string;
 }
 
+export interface FeasibilityAnalysis {
+  timelineFeasibility: {
+    proposedDuration: string;
+    isRealistic: boolean;
+    weatherImpact: string;
+    seasonalConstraints: string[];
+    recommendation: string;
+  };
+  resourceAvailability: {
+    laborAvailable: boolean;
+    materialsAccessible: boolean;
+    equipmentAvailable: boolean;
+    concerns: string[];
+  };
+  historicalComparison: {
+    similarProjectsFound: boolean;
+    averageDuration: string;
+    successRate: string;
+    keyLearnings: string[];
+  };
+  riskFactors: {
+    factor: string;
+    impact: 'low' | 'medium' | 'high';
+    mitigation: string;
+  }[];
+  overallFeasibility: 'highly-feasible' | 'feasible' | 'challenging' | 'not-feasible';
+  feasibilityScore: number; // 0-100
+}
+
+export interface GuidelineRecommendation {
+  guidelineReference: string;
+  currentStatus: 'compliant' | 'partial' | 'non-compliant' | 'missing';
+  issue: string;
+  recommendation: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  actionRequired: string;
+}
+
 export interface ComprehensiveAuditReport {
   overallRiskScore: number; // 0-100
   totalIssuesFound: number;
@@ -32,6 +70,8 @@ export interface ComprehensiveAuditReport {
     materialCostsFair: boolean;
   };
   fraudIndicators: string[];
+  guidelineRecommendations: GuidelineRecommendation[];
+  feasibilityAnalysis: FeasibilityAnalysis;
   summary: string;
 }
 
@@ -44,7 +84,7 @@ export async function performComprehensiveAudit(
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
-You are an AI auditor for government infrastructure projects. Perform a COMPREHENSIVE verification of this DPR document.
+You are an AI auditor for government infrastructure projects. Act like a REAL HUMAN AUDITOR who reviews projects based on past experience and practical knowledge.
 
 ⚠️ CRITICAL IMAGE/OCR REQUIREMENT:
 This document may contain SCANNED PAGES, IMAGES, TABLES AS PICTURES, or EMBEDDED VISUALS. You MUST:
@@ -53,52 +93,54 @@ This document may contain SCANNED PAGES, IMAGES, TABLES AS PICTURES, or EMBEDDED
 - DO NOT SKIP any visual content - extract text from every image
 - Treat scanned documents as fully readable text
 
-CRITICAL INSTRUCTIONS:
-1. Cross-check ALL factual claims by searching online (from text AND images)
-2. Validate ALL economic parameters against market rates (extract from tables/images)
-3. Detect inconsistencies, fraud indicators, and suspicious claims
-4. Flag high-risk areas with detailed explanations
-5. Provide sources for every verification
-6. READ ALL IMAGES: Extract complete data from scanned BOQ, budget tables, and cost estimates
+YOUR ROLE AS AI AUDITOR:
+You are reviewing this project like a senior government auditor with 20+ years of experience. You know:
+- How weather affects construction (monsoons, winters, extreme heat)
+- How long similar projects ACTUALLY take (not just what's written)
+- What can go wrong based on past projects
+- Whether timelines are realistic considering ground realities
+- Resource availability in different regions
+- Common mistakes contractors make
 
-VERIFICATION CHECKLIST:
+COMPREHENSIVE AUDIT TASKS:
 
-A. FACTUAL CLAIMS TO VERIFY:
-   - Land ownership details (cross-check with public records if mentioned)
-   - Project location and area details
-   - Contractor/supplier credentials
-   - Timeline and milestones (check if realistic)
-   - Environmental clearances mentioned
-   - Rehabilitation plans (if any)
-   - Population/demographic data
-   - Infrastructure claims (existing facilities, connectivity)
+1. FRAUD DETECTION & VERIFICATION:
+   - Cross-check factual claims
+   - Validate economic parameters against market rates
+   - Detect inflated costs, duplicate entries, suspicious patterns
+   - Flag high-risk areas
 
-B. ECONOMIC PARAMETERS TO VALIDATE:
-   - Land acquisition costs (compare with circle rates/market rates)
-   - Compensation amounts (check if fair and legal)
-   - Labor costs (compare with minimum wages and market rates)
-   - Material costs (compare with current market prices)
-   - Equipment costs
-   - Administrative costs
-   - Contingency provisions
-   - Total project budget (check if realistic)
+2. GUIDELINE COMPLIANCE & RECOMMENDATIONS:
+   - Check compliance with MDoNER/PM-DevINE guidelines
+   - Identify missing mandatory components
+   - Provide specific recommendations to fix non-compliance
+   - Prioritize what needs immediate attention
 
-C. FRAUD INDICATORS TO DETECT:
-   - Inflated costs (>30% above market rate)
-   - Duplicate claims or entries
-   - Unrealistic timelines
-   - Missing mandatory information
-   - Suspicious round numbers
-   - Inconsistent data across sections
-   - Over-estimation of quantities
-   - Under-estimation of risks
-
-D. HIGH-RISK AREAS:
-   - Budget items with no justification
-   - Claims without supporting evidence
-   - Unusual payment terms
-   - Vague specifications
-   - Missing regulatory approvals
+3. FEASIBILITY ANALYSIS (LIKE A REAL HUMAN AUDITOR):
+   **Timeline Feasibility:**
+   - Is the proposed timeline realistic?
+   - Example: "6-month road construction" - Consider:
+     * Monsoon season (3-4 months of rain = no work)
+     * Winter delays in hilly areas
+     * Festival seasons when labor is unavailable
+     * Equipment availability
+   
+   **Resource Availability:**
+   - Is skilled labor available in this region?
+   - Are materials easily accessible or need to be transported?
+   - Is heavy equipment available locally?
+   
+   **Historical Comparison:**
+   - Based on similar past projects, what's the realistic timeline?
+   - What's the typical success rate for such projects?
+   - What lessons can we learn from past projects?
+   
+   **Risk Factors:**
+   - Weather impact (monsoon, winter, extreme heat)
+   - Geographical challenges (hilly terrain, remote location)
+   - Political/social factors
+   - Supply chain issues
+   - Labor availability
 
 RESPONSE FORMAT (JSON only, no markdown):
 {
@@ -127,6 +169,46 @@ RESPONSE FORMAT (JSON only, no markdown):
     "materialCostsFair": true/false
   },
   "fraudIndicators": ["list of fraud red flags found"],
+  "guidelineRecommendations": [
+    {
+      "guidelineReference": "specific guideline name/section",
+      "currentStatus": "compliant|partial|non-compliant|missing",
+      "issue": "what's wrong or missing",
+      "recommendation": "specific action to fix it",
+      "priority": "low|medium|high|critical",
+      "actionRequired": "detailed steps to resolve"
+    }
+  ],
+  "feasibilityAnalysis": {
+    "timelineFeasibility": {
+      "proposedDuration": "extract from document",
+      "isRealistic": true/false,
+      "weatherImpact": "detailed analysis of how weather affects timeline",
+      "seasonalConstraints": ["monsoon delays", "winter issues", etc],
+      "recommendation": "realistic timeline with justification"
+    },
+    "resourceAvailability": {
+      "laborAvailable": true/false,
+      "materialsAccessible": true/false,
+      "equipmentAvailable": true/false,
+      "concerns": ["specific concerns about resources"]
+    },
+    "historicalComparison": {
+      "similarProjectsFound": true/false,
+      "averageDuration": "typical duration for similar projects",
+      "successRate": "success rate of similar projects",
+      "keyLearnings": ["lessons from past projects"]
+    },
+    "riskFactors": [
+      {
+        "factor": "specific risk (weather, resources, etc)",
+        "impact": "low|medium|high",
+        "mitigation": "how to address this risk"
+      }
+    ],
+    "overallFeasibility": "highly-feasible|feasible|challenging|not-feasible",
+    "feasibilityScore": 0-100
+  },
   "summary": "comprehensive summary of audit findings"
 }
 
@@ -136,7 +218,8 @@ ${dprText.substring(0, 30000)}
 EXISTING ANALYSIS CONTEXT:
 ${JSON.stringify(dprAnalysis, null, 2)}
 
-Perform thorough verification and return ONLY the JSON response.
+Think like a real human auditor with years of experience. Consider practical ground realities, not just what's written on paper.
+Return ONLY the JSON response.
 `;
 
   try {
@@ -195,6 +278,31 @@ Perform thorough verification and return ONLY the JSON response.
           materialCostsFair: false,
         },
         fraudIndicators: auditData.fraudIndicators || [],
+        guidelineRecommendations: auditData.guidelineRecommendations || [],
+        feasibilityAnalysis: auditData.feasibilityAnalysis || {
+          timelineFeasibility: {
+            proposedDuration: 'Not specified',
+            isRealistic: false,
+            weatherImpact: 'Not analyzed',
+            seasonalConstraints: [],
+            recommendation: 'Requires detailed timeline analysis',
+          },
+          resourceAvailability: {
+            laborAvailable: false,
+            materialsAccessible: false,
+            equipmentAvailable: false,
+            concerns: ['Insufficient data for analysis'],
+          },
+          historicalComparison: {
+            similarProjectsFound: false,
+            averageDuration: 'No data',
+            successRate: 'No data',
+            keyLearnings: [],
+          },
+          riskFactors: [],
+          overallFeasibility: 'challenging',
+          feasibilityScore: 50,
+        },
         summary: auditData.summary || 'Audit completed',
       };
     }

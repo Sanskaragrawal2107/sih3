@@ -42,6 +42,44 @@ export interface VerificationIssue {
   recommendation: string;
 }
 
+export interface FeasibilityAnalysis {
+  timelineFeasibility: {
+    proposedDuration: string;
+    isRealistic: boolean;
+    weatherImpact: string;
+    seasonalConstraints: string[];
+    recommendation: string;
+  };
+  resourceAvailability: {
+    laborAvailable: boolean;
+    materialsAccessible: boolean;
+    equipmentAvailable: boolean;
+    concerns: string[];
+  };
+  historicalComparison: {
+    similarProjectsFound: boolean;
+    averageDuration: string;
+    successRate: string;
+    keyLearnings: string[];
+  };
+  riskFactors: {
+    factor: string;
+    impact: 'low' | 'medium' | 'high';
+    mitigation: string;
+  }[];
+  overallFeasibility: 'highly-feasible' | 'feasible' | 'challenging' | 'not-feasible';
+  feasibilityScore: number; // 0-100
+}
+
+export interface GuidelineRecommendation {
+  guidelineReference: string;
+  currentStatus: 'compliant' | 'partial' | 'non-compliant' | 'missing';
+  issue: string;
+  recommendation: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  actionRequired: string;
+}
+
 export interface ComprehensiveAuditReport {
   overallRiskScore: number;
   totalIssuesFound: number;
@@ -63,6 +101,8 @@ export interface ComprehensiveAuditReport {
     materialCostsFair: boolean;
   };
   fraudIndicators: string[];
+  guidelineRecommendations: GuidelineRecommendation[];
+  feasibilityAnalysis: FeasibilityAnalysis;
   summary: string;
 }
 
